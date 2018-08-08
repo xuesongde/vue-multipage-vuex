@@ -25,7 +25,7 @@ export default {
   },
   methods:{
     doIt(){
-      location.href='/page2.html'
+      location.href='page2.html'
     }
   }
 }

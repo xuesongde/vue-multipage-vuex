@@ -10,14 +10,24 @@
 </style>
 
 <template>
-  <div id="app">
+  <div id="app" @click="doIt">
     这是第二个页面
   </div>
 </template>
 
 <script>
 export default {
-  name: 'App'
+  name: 'App',
+  data(){
+    return{
+
+    }
+  },
+  methods:{
+    doIt(){
+      location.href='page1.html'
+    }
+  }
 }
 </script>
 

@@ -99,3 +99,78 @@ exports.createNotifierCallback = () => {
     })
   }
 }
+//提取公共入口文件获取 页面输出文件遍历代码
+var projectRoot = '.'
+var glob = require('glob')
+// 获取页面入口js路径
+var entries = (function() {
+  var entryFiles = glob.sync(projectRoot + '/src/*.js')
+  var map = {}
+  entryFiles.forEach(function(filePath){
+    var filename = filePath.substring(filePath.lastIndexOf('\/') + 1, filePath.lastIndexOf('.'))
+    map[filename] = filePath
+  })
+  return map
+})();
+exports.entries=entries;
+
+
+const HtmlWebpackPlugin = require('html-webpack-plugin')
+// 自动生成入口文件，入口js名必须和入口文件名相同 输出多html
+var plugins;
+if(process.env.NODE_ENV === 'production'){
+  plugins = (function() {
+    // var entryHtml = glob.sync(projectRoot + 'src/*.html')
+    var r = []
+    for(var i in entries){
+        var filename = i;
+        //var filePath = entries[i].substring(0,entries[i].lastIndexOf('.')) + '.html'
+        var filePath = 'index/'+entries[i].split('/')[2].split('.')[0]+'.html'
+        var conf = {
+            template: filePath,
+            filename: filename + '.html'
+        }
+        
+        conf.inject = 'body'
+        //conf.chunks = ['vender', 'common', filename]
+        conf.minify={
+          removeComments: true,
+          collapseWhitespace: true,
+          removeAttributeQuotes: true
+          // more options:
+          // https://github.com/kangax/html-minifier#options-quick-reference
+        }
+        conf.chunksSortMode='dependency'
+        conf.chunks=['manifest','vendor',filename]
+        // if(/b|c/.test(filename)) conf.chunks.splice(2, 0, 'common-b-c')
+        r.push(new HtmlWebpackPlugin(conf))
+    }
+
+    return r
+    
+})()
+}else{
+  plugins = (function() {
+      // var entryHtml = glob.sync(projectRoot + 'src/*.html')
+      var r = []
+      for(var i in entries){
+          var filename = i;
+          //var filePath = entries[i].substring(0,entries[i].lastIndexOf('.')) + '.html'
+          var filePath = 'index/'+entries[i].split('/')[2].split('.')[0]+'.html'
+          var conf = {
+              template: filePath,
+              filename: filename + '.html'
+          }
+          conf.inject = 'body'
+          conf.chunks = ['vender', 'common', filename]
+
+          // if(/b|c/.test(filename)) conf.chunks.splice(2, 0, 'common-b-c')
+          r.push(new HtmlWebpackPlugin(conf))
+      }
+
+      return r
+      
+  })()
+}
+
+exports.plugins=plugins;

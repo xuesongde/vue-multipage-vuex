@@ -9,59 +9,16 @@ const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const ExtractTextPlugin = require('extract-text-webpack-plugin')
 const OptimizeCSSPlugin = require('optimize-css-assets-webpack-plugin')
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
+//改用 webpack-parallel-uglify-plugin 插件，它可以并行运行 UglifyJS 插件 减少构建时间 很小的项目减少了1s左右
+var ParallelUglifyPlugin = require('webpack-parallel-uglify-plugin');
+//const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const env = require('../config/prod.env')
+//引入happypack
+const HappyPack = require('happypack');
+const os = require('os');
+const happyThreadPool = HappyPack.ThreadPool({ size: os.cpus().length });
 
-var projectRoot = '.'
-var glob = require('glob')
-// 获取页面入口js路径
-var entries = (function() {
-  var entryFiles = glob.sync(projectRoot + '/src/*.js')
-  var map = {}
-  entryFiles.forEach(function(filePath){
-    var filename = filePath.substring(filePath.lastIndexOf('\/') + 1, filePath.lastIndexOf('.'))
-    map[filename] = filePath
-  })
-  return map
-})();
-
-console.log(entries)
-
-// 自动生成入口文件，入口js名必须和入口文件名相同
-var plugins = (function() {
-    // var entryHtml = glob.sync(projectRoot + 'src/*.html')
-    var r = []
-    for(var i in entries){
-        var filename = i;
-        //var filePath = entries[i].substring(0,entries[i].lastIndexOf('.')) + '.html'
-        var filePath = 'index/'+entries[i].split('/')[2].split('.')[0]+'.html'
-        var conf = {
-            template: filePath,
-            filename: filename + '.html'
-        }
-        
-        conf.inject = 'body'
-        conf.chunks = ['vender', 'common', filename]
-        conf.minify={
-          removeComments: true,
-          collapseWhitespace: true,
-          removeAttributeQuotes: true
-          // more options:
-          // https://github.com/kangax/html-minifier#options-quick-reference
-        }
-        conf.chunksSortMode='dependency'
-        conf.chunks=['manifest','vendor']
-        // if(/b|c/.test(filename)) conf.chunks.splice(2, 0, 'common-b-c')
-        r.push(new HtmlWebpackPlugin(conf))
-    }
-
-    return r
-    
-})()
-
-console.log(plugins)
-console.log(utils.assetsPath('js/[name].[chunkhash].js'))
 const webpackConfig = merge(baseWebpackConfig, {
   module: {
     rules: utils.styleLoaders({
@@ -81,14 +38,25 @@ const webpackConfig = merge(baseWebpackConfig, {
     new webpack.DefinePlugin({
       'process.env': env
     }),
-    new UglifyJsPlugin({
-      uglifyOptions: {
+    // new UglifyJsPlugin({
+    //   uglifyOptions: {
+    //     compress: {
+    //       warnings: false
+    //     }
+    //   },
+    //   sourceMap: config.build.productionSourceMap,
+    //   parallel: true
+    // }),
+    new ParallelUglifyPlugin({
+      cacheDir: '.cache/',
+      uglifyJS:{
+        output: {
+          comments: false
+        },
         compress: {
           warnings: false
         }
-      },
-      sourceMap: config.build.productionSourceMap,
-      parallel: true
+      }
     }),
     // extract css into its own file
     new ExtractTextPlugin({
@@ -109,36 +77,6 @@ const webpackConfig = merge(baseWebpackConfig, {
     // generate dist index.html with correct asset hash for caching.
     // you can customize output by editing /index.html
     // see https://github.com/ampedandwired/html-webpack-plugin
-    // new HtmlWebpackPlugin({
-    //   filename: config.build.index,
-    //   template: 'index/logmonit.html',
-    //   inject: true,
-    //   minify: {
-    //     removeComments: true,
-    //     collapseWhitespace: true,
-    //     removeAttributeQuotes: true
-    //     // more options:
-    //     // https://github.com/kangax/html-minifier#options-quick-reference
-    //   },
-    //   // necessary to consistently work with multiple chunks via CommonsChunkPlugin
-    //   chunksSortMode: 'dependency',
-    //   chunks: ['manifest','vendor','app']
-    // }),
-    // new HtmlWebpackPlugin({
-    //   filename: config.build.index2,
-    //   template: 'index/heatchart.html',
-    //   inject: true,
-    //   minify: {
-    //     removeComments: true,
-    //     collapseWhitespace: true,
-    //     removeAttributeQuotes: true
-    //     // more options:
-    //     // https://github.com/kangax/html-minifier#options-quick-reference
-    //   },
-    //   // necessary to consistently work with multiple chunks via CommonsChunkPlugin
-    //   chunksSortMode: 'dependency',
-    //   chunks: ['manifest','vendor','app2']
-    // }),
     // keep module.id stable when vendor modules does not change
     new webpack.HashedModuleIdsPlugin(),
     // enable scope hoisting
@@ -188,8 +126,20 @@ const webpackConfig = merge(baseWebpackConfig, {
             verbose:  true,        　　　　　　　　　　//开启在控制台输出信息
             dry:      false        　　　　　　　　　　//启用删除文件
         }
-    )
-  ].concat(plugins)
+    ),
+    new HappyPack({
+        //用id来标识 happypack处理那里类文件
+      id: 'happyBabel',
+      //如何处理  用法和loader 的配置一样
+      loaders: [{
+        loader: 'babel-loader?cacheDirectory=true',
+      }],
+      //共享进程池
+      threadPool: happyThreadPool,
+      //允许 HappyPack 输出日志
+      verbose: true,
+    })
+  ].concat(utils.plugins)
 })
 
 if (config.build.productionGzip) {
